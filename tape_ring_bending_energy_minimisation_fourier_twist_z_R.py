@@ -390,19 +390,16 @@ def R_fourier(fourier_amps,psi,R0):
 def bending_energy_opt(params,phi_0):
     """
     Function for calculating the strain energy in the deformed tape ring, which is then minimised
-
     Parameters
     ----------
     params : Array of floats
         The amplitudes of the different components of phi, z , R.
     phi_0 : Float
         Applied tape ring rotation.
-
     Returns
     -------
     total_energy : Float
         Total strain energy in tape ring for given amplitude parameters.
-
     """
 
     fourier_amps_twist = [params[0],params[1],params[2],params[3]]
@@ -412,15 +409,14 @@ def bending_energy_opt(params,phi_0):
     alpha = np.pi/2
     theta = np.linspace(-alpha/2,alpha/2,100)
     psi  = np.linspace(0,np.pi/2,1000)
-    psi,theta = np.meshgrid(psi,theta)
+    psi,theta = np.meshgrid(psi,theta) #creating the arrays of psi & theta values
     
-    
+    #calculating the twist, Z & R displacements
     twist = twist_fourier(fourier_amps_twist, psi, phi_0)
-    
     z_offset = z_fourier(fourier_amps_z,psi)
     R = R_fourier(fourier_amps_R,psi,R0)
     
-     
+    #Here the undeformed x,y,z coordinates of the surface are determined 
     x0 = (R + r*np.sin(theta))*np.cos(psi)
     y0 = (R + r*np.sin(theta))*np.sin(psi)
     z0 = r*np.cos(theta) 
@@ -435,12 +431,8 @@ def bending_energy_opt(params,phi_0):
     dz0 = np.gradient(z0,axis=0,edge_order =2)
     dist0_trans = (dx0**2 +dy0**2 +dz0**2)**0.5
     
-    """ Old method where section twists around middle of circle """
-    # x = (R + r*np.sin(theta+twist))*np.cos(psi)
-    # y = (R + r*np.sin(theta+twist))*np.sin(psi)
-    # z = r*np.cos(theta+twist) + z_offset
     
-    """ New method where section twists around middle of arc"""
+    #Here the x,y,z coordinates of the surface are determined
     x = (R -r*prop_down*np.sin(twist)+ r*np.sin(theta+twist))*np.cos(psi)
     y = (R -r*prop_down*np.sin(twist) + r*np.sin(theta+twist))*np.sin(psi)
     z = r*np.cos(theta+twist) -r*prop_down*np.cos(twist) + z_offset
@@ -456,6 +448,7 @@ def bending_energy_opt(params,phi_0):
     dz = np.gradient(z,axis=0,edge_order =2)
     dist_trans = (dx**2 +dy**2 +dz**2)**0.5   #nodal distances along the theta direction
     
+    #calculating the first derivatives of the position vector
     r_theta_u = np.gradient(x,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
     r_theta_v = np.gradient(y,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
     r_theta_w = np.gradient(z,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
@@ -464,15 +457,18 @@ def bending_energy_opt(params,phi_0):
     r_psi_v = np.gradient(y,axis=1,edge_order=2)/np.gradient(psi,axis=1,edge_order=2)
     r_psi_w = np.gradient(z,axis=1,edge_order=2)/np.gradient(psi,axis=1,edge_order=2)
     
+    #calculating the components of the normal vector
     n_u = r_theta_v*r_psi_w-r_theta_w*r_psi_v
     n_v = - (r_theta_u*r_psi_w-r_theta_w*r_psi_u)
     n_w = r_theta_u*r_psi_v-r_psi_u*r_theta_v
     
+    #normalising the normal vector
     mag = (n_u**2+n_v**2+n_w**2)**0.5
     n_u = n_u/mag
     n_v = n_v/mag
     n_w = n_w/mag
     
+    #calculating the second derivatives of the position vector
     r_theta_theta_u = np.gradient(r_theta_u,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
     r_theta_theta_v = np.gradient(r_theta_v,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
     r_theta_theta_w = np.gradient(r_theta_w,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
@@ -485,6 +481,7 @@ def bending_energy_opt(params,phi_0):
     r_psi_psi_v = np.gradient(r_psi_v,axis=1,edge_order=2)/np.gradient(psi,axis=1,edge_order=2)
     r_psi_psi_w = np.gradient(r_psi_w,axis=1,edge_order=2)/np.gradient(psi,axis=1,edge_order=2)
     
+    #calculating the coefficients of the first and second fundemental forms
     E = r_theta_u**2 + r_theta_v**2 + r_theta_w**2
     F = r_theta_u*r_psi_u + r_theta_v*r_psi_v + r_theta_w*r_psi_w
     G = r_psi_u**2 + r_psi_v**2 + r_psi_w**2
@@ -493,30 +490,37 @@ def bending_energy_opt(params,phi_0):
     M = r_theta_psi_u*n_u + r_theta_psi_v*n_v +r_theta_psi_w*n_w
     N = r_psi_psi_u*n_u + r_psi_psi_v*n_v +r_psi_psi_w*n_w
 
+    #calculating the principal curvatures, and curvature in original principal directions
     k1,k2,psi_1,psi_2 = curvature_roots(E, F, G, L, M, N)   
     kx,ky = curvature_original_directions(E, F, G, L, M, N)   #kx is as expeceted
     
-    #vec 1 is in psi direction, vec 2 in theta direction
+    #original curvatures (analytical expressions)
     k10 = -np.sin(theta)/(R+r*np.sin(theta))
     k20 = -1/r
     K0 = k10*k20
 
+    #calculating twist using Mohr's circle and principal curvatures
     mohrs_radius = np.abs(k1-k2)/2
     C = (k1+k2)/2
     kxy = (mohrs_radius**2-(kx-C)**2)**0.5
     kxy = np.nan_to_num(kxy)   #this is looking better
 
+    #calculting change in curvatures andn twist
     dk1 = ky-k10
     dk2 = kx-k20
     dk12 = kxy
+    
+    #change in Gaussian curvature
     dK = k1*k2-K0
 
+    #integrating Gaussian curvature to obtain longitudinal strains
     int_1 = np.cumsum(dK, axis=0)*r*alpha/100
-    int_1 = int_1 - np.mean(int_1,axis=0)
+    #int_1 = int_1 - np.mean(int_1,axis=0)
     
     int_2 = np.cumsum(int_1, axis=0)*r*alpha/100  #this should be the strains
-    int_2 = int_2 - np.mean(int_2,axis=0)  #making sure force is zero
+    #int_2 = int_2 - np.mean(int_2,axis=0)  #making sure force is zero
     
+    #setting the integration constants for zero force and moment
     y = theta*r
     force = np.sum(int_2,axis=0)*E*t*(b/100)
     moment = np.sum(int_2*y,axis=0)*E*t*(b/100)
@@ -525,22 +529,14 @@ def bending_energy_opt(params,phi_0):
     C3 = (12/(E*t*b**3))*(0-moment)
     int_2 = int_2 + C3*y +D3
     
-    global strains
-    strains_long  = (dist_long-dist0_long)/dist0_long + int_2
-    strains_trans = (dist_trans-dist0_trans)/dist0_trans
-    
     strains_long = int_2
-    #print(np.sum(np.abs(strains_trans)))
-    strains_trans = strains_trans*0
-    
+
     energy_bending = 0.5*D*(dk1**2 + 2*v*dk1*dk2 +dk2**2 +2*(1-v)*dk12**2)  #per unit area
-    #energy_bending = 0.5*D*((k1-k10)**2 + 2*v*(k1-k10)*(k2-k20) +(k2-k20)**2)  #per unit area
+    energy_stretching = (1/(2*(1-v**2)))*E_y*t*strains_long**2 
     
-    energy_stretching = (1/(2*(1-v**2)))*E_y*t*strains_long**2 #+ 0.5*E_y*t*strains_trans**2  #per unit area    #this appears to be 5000 times more dominant!
-    energy_stretching = energy_stretching
-    #print(np.sum(energy_stretching)/np.sum(energy_bending))
+    #total energy
     total_energy = np.sum(energy_bending*dist_long*dist_trans) + np.sum(energy_stretching*dist_long*dist_trans)
-    #total_energy = total_energy*alpha*r*(np.pi/2)*R
+   
     
     return total_energy
 
@@ -570,17 +566,16 @@ def bending_energy_plot(params,phi_0,it):
     alpha = np.pi/2
     theta = np.linspace(-alpha/2,alpha/2,30)
     psi  = np.linspace(0,np.pi*2,1020)
-    psi,theta = np.meshgrid(psi,theta)
+    psi,theta = np.meshgrid(psi,theta)  #creating the arrays of psi & theta values
     
     
-    
+    #calculating the twist, Z & R displacements
     twist = twist_fourier(fourier_amps_twist, psi, phi_0)
-    
     z_offset = z_fourier(fourier_amps_z,psi)
     R = R_fourier(fourier_amps_R,psi,R0)
     
         
-    """ New method where section twists around middle of arc"""
+    #Here the x,y,z coordinates of the surface are determined
     x = (R -r*prop_down*np.sin(twist)+ r*np.sin(theta+twist))*np.cos(psi)
     y = (R -r*prop_down*np.sin(twist) + r*np.sin(theta+twist))*np.sin(psi)
     z = r*np.cos(theta+twist) -r*prop_down*np.cos(twist) + z_offset
@@ -596,6 +591,7 @@ def bending_energy_plot(params,phi_0,it):
     dz = np.gradient(z,axis=0,edge_order =2)
     dist_trans = (dx**2 +dy**2 +dz**2)**0.5   #nodal distances along the theta direction
     
+    #calculating the first derivatives of the position vector
     r_theta_u = np.gradient(x,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
     r_theta_v = np.gradient(y,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
     r_theta_w = np.gradient(z,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
@@ -604,15 +600,18 @@ def bending_energy_plot(params,phi_0,it):
     r_psi_v = np.gradient(y,axis=1,edge_order=2)/np.gradient(psi,axis=1,edge_order=2)
     r_psi_w = np.gradient(z,axis=1,edge_order=2)/np.gradient(psi,axis=1,edge_order=2)
     
+    #calculating the components of the normal vector
     n_u = r_theta_v*r_psi_w-r_theta_w*r_psi_v
     n_v = - (r_theta_u*r_psi_w-r_theta_w*r_psi_u)
     n_w = r_theta_u*r_psi_v-r_psi_u*r_theta_v
     
+    #normalising the normal vector
     mag = (n_u**2+n_v**2+n_w**2)**0.5
     n_u = n_u/mag
     n_v = n_v/mag
     n_w = n_w/mag
     
+    #calculating the second derivatives of the position vector
     r_theta_theta_u = np.gradient(r_theta_u,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
     r_theta_theta_v = np.gradient(r_theta_v,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
     r_theta_theta_w = np.gradient(r_theta_w,axis=0,edge_order=2)/np.gradient(theta,axis=0,edge_order=2)
@@ -625,6 +624,7 @@ def bending_energy_plot(params,phi_0,it):
     r_psi_psi_v = np.gradient(r_psi_v,axis=1,edge_order=2)/np.gradient(psi,axis=1,edge_order=2)
     r_psi_psi_w = np.gradient(r_psi_w,axis=1,edge_order=2)/np.gradient(psi,axis=1,edge_order=2)
     
+    #calculating the coefficients of the first and second fundemental forms
     E = r_theta_u**2 + r_theta_v**2 + r_theta_w**2
     F = r_theta_u*r_psi_u + r_theta_v*r_psi_v + r_theta_w*r_psi_w
     G = r_psi_u**2 + r_psi_v**2 + r_psi_w**2
@@ -633,34 +633,39 @@ def bending_energy_plot(params,phi_0,it):
     M = r_theta_psi_u*n_u + r_theta_psi_v*n_v +r_theta_psi_w*n_w
     N = r_psi_psi_u*n_u + r_psi_psi_v*n_v +r_psi_psi_w*n_w
 
+    #calculating the principal curvatures, and curvature in original principal directions
     k1,k2,psi_1,psi_2 = curvature_roots(E, F, G, L, M, N)   
     kx,ky = curvature_original_directions(E, F, G, L, M, N)   #kx is as expeceted
     
+    #original curvatures (analytical expressions)
     #vec 1 is in psi direction, vec 2 in theta direction
     k10 = -np.sin(theta)/(R+r*np.sin(theta))
     k20 = -1/r
     K0 = k10*k20
 
+    #calculating twist using Mohr's circle and principal curvatures
     mohrs_radius = np.abs(k1-k2)/2
     C = (k1+k2)/2
     kxy = (mohrs_radius**2-(kx-C)**2)**0.5
     kxy = np.nan_to_num(kxy)   #this is looking better
 
+    #calculting change in curvatures andn twist
     dk1 = ky-k10
     dk2 = kx-k20
-    
-    
     dk12 = kxy
+    
+    #change in Gaussian curvature
     dK = k1*k2-K0
 
+    #integrating Gaussian curvature to obtain longitudinal strains
     int_1 = np.cumsum(dK, axis=0)*r*alpha/30
     int_1 = int_1 - np.mean(int_1,axis=0)
     
     int_2 = np.cumsum(int_1, axis=0)*r*alpha/30  #this should be the strains
-    int_2 = int_2 - np.mean(int_2,axis=0)  #making sure force is zero
+    #int_2 = int_2 - np.mean(int_2,axis=0)  
     
     
-    #setting constants for zero force and moment
+    #setting the integration constants for zero force and moment
     yb = theta*r
     force = np.sum(int_2,axis=0)*E_y*t*(b/30)
     moment = np.sum(int_2*yb,axis=0)*E_y*t*(b/30)
@@ -672,32 +677,21 @@ def bending_energy_plot(params,phi_0,it):
     
     strains_long = int_2
     
+    #calculating the strain energy in bending and stretching
+    
     energy_bending = 0.5*D*(dk1**2 + 2*v*dk1*dk2 +dk2**2 +2*(1-v)*dk12**2)  #per unit area
 
     energy_stretching = (1/(2*(1-v**2)))*E_y*t*strains_long**2 #+ 0.5*E_y*t*strains_trans**2  #per unit area    #this appears to be 5000 times more dominant!
   
+    #total energy
     total_E = energy_stretching + energy_bending
     
-    val = total_E
 
-    #max_val = np.max(np.abs(val))
-    true_min = np.min(val)
-    true_max = np.max(val)
 
-    #vmin = -max_val 
-    #vmax = max_val
-    from matplotlib import cm
-    from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-
-    #white_val = (0-true_min)/(true_max-true_min)
-    stress = strains_long*E_y
-    print(np.max(stress)/1e6)
-    #max E = 2773
-    #print(np.max(stress))
-    print(np.mean(total_E))
+    #plotting coloured by change in Gaussian curvature
     
     alph = (dK-0)/4720
-    #colors = cmap2(alph)
+
     colors = cm.jet(alph)
     
     print('max dK',np.max(dK))
